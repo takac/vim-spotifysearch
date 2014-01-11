@@ -60,15 +60,30 @@ function! s:TrackParse()
     let b:uris = []
     let i = 2
     let last = line("$")
-    while i < last
+    while i <= last
         call add(b:uris, getline(i)[-36:])
         let i = i + 1
     endwhile
     silent! 2,$s/.\{36}$//
+    silent! %s;\\;;g
     if exists(":Tabularize")
         silent! %Tabularize /    
     endif
-    silent! %s;\\;;g
+    let i = 2
+    while i <= last
+        if i % 2 == 0
+            call setline(i, getline(i) . ' ')
+        else 
+            call setline(i, getline(i) . '  ')
+        endif
+        let i = i + 1
+    endwhile
+    syn match trackOne '.*\S\s$' display
+    syn match trackTwo '.*\s\s$' display
+    syn match headers 'Track\s*Artist\s*Release Year\s*Album'
+    hi def link trackOne Type
+    hi def link trackTwo PreProc
+    hi def link headers Comment
 endfunction
 
 command! -nargs=* SpotifySearch call SearchTrack("<args>")
