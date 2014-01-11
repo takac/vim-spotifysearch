@@ -5,6 +5,7 @@ A plugin to allow you to search and play tracks from spotify right inside Vim.o
 
     :SpotifySearch yeezus
 Yields a new window with the search results 
+    
     Track                    Artist             Release Year      Album
     Bound 2                  Kanye West         2013              Yeezus
     Black Skinhead           Kanye West         2013              Yeezus
