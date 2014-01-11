@@ -22,6 +22,10 @@ Yields a new window with the search results
 
 Just hit enter to have the song played by spotify.
 
+### Example Screenshot
+
+<img src="screenshot.png" height="80%" width="80%" alt="screenshot"/>
+
 ### Installation
 I recommend installing using [Vundle](https://github.com/gmarik/vundle):
 
