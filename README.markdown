@@ -1,11 +1,12 @@
 Vim Spotify Search
 ==================
 
-A plugin to allow you to search and play tracks from spotify right inside Vim.o
+A plugin to allow you to search and play tracks from spotify right inside Vim.
 
     :SpotifySearch yeezus
-Yields a new window with the search results 
-    
+
+Yields a new window with the search results
+
     Track                    Artist             Release Year      Album
     Bound 2                  Kanye West         2013              Yeezus
     Black Skinhead           Kanye West         2013              Yeezus
@@ -19,10 +20,9 @@ Yields a new window with the search results
     I'm In It                Kanye West         2013              Yeezus
     .
     .
+    .
 
 Just hit enter to have the song played by spotify.
-
-### Example Screenshot
 
 <img src="screenshot.png" height="80%" width="80%" alt="screenshot"/>
 

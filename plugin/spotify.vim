@@ -2,7 +2,7 @@
 " Version: 0.2
 
 if &cp || version < 700
-        finish
+    finish
 end
 
 let s:spotify_track_search_url = "http://ws.spotify.com/search/1/track.json?q="
@@ -13,7 +13,8 @@ function! s:OpenUri(uri)
     elseif has("unix")
         call system("spotify " . a:uri)
     else
-        " TODO other
+        " TODO others
+        throw "Platform unsupported"
     endif
 endfunction
 
@@ -30,7 +31,6 @@ function! s:WgetIntoBuffer(url)
     exec 'silent r!wget -qO- "' . a:url . '"'
 endfunction
 
-" It is possible to use netrw to read from network
 function! s:SearchSpotIntoBuffer(track)
     let l:trackUri = s:spotify_track_search_url . a:track
     if executable("curl")
@@ -38,10 +38,12 @@ function! s:SearchSpotIntoBuffer(track)
     elseif executable("wget")
         call s:WgetIntoBuffer(l:trackUri)
     elseif exists(":Nread")
+        throw "No supported yet.."
+        " Use netrw to read from network
         let l:command = 'silent! edit! '. l:trackUri
         exec l:command
     else
-        " TODO Throw error
+        throw "No viable method for calling json api"
     endif
 endfunction
 
@@ -90,16 +92,17 @@ function! s:TrackParse()
     silent 1d
     call append(0, "Track    Artist    Release Year    Album")
     silent! 2,$s/\\"//g
-    silent! 2,$s/\v.*\{"released": "(\d{4})", "href": "[^"]+", "name": "([^"]+)", "availability": \{"territories": "[^"]+"\}}, "name": "([^"]+)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .*name": "([^"]+)"}].*/\3    \5    \1    \2\4
+    silent! 2,$s/\v.*\{"released": "(\d{4})", "href": "[^"]+", "name": "([^"]+)", "availability": \{"territories": "[^"]+"\}}, "name": "([^"]{0,45})[^"]*", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .*name": "([^"]+)"}].*/\3    \5    \1    \2\4
     let b:uris = []
     let i = 2
     let last = line("$")
     while i <= last
         call add(b:uris, getline(i)[-36:])
+        call setline(i, getline(i)[:-36])
         let i = i + 1
     endwhile
-    silent! 2,$s/.\{36}$//
-    silent! %s;\\;;g
+    " Convert unicode characters
+    silent! %s#\\u[0-9a-f]*#\=eval('"'.submatch(0).'"')#g
     if exists(":Tabularize")
         silent! %Tabularize /    
     endif
