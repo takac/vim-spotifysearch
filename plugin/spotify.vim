@@ -1,8 +1,20 @@
+" Author: Tom Cammann 
+" Version: 0.2
+
+if &cp || version < 700
+        finish
+end
+
 let s:spotify_track_search_url = "http://ws.spotify.com/search/1/track.json?q="
 
 function! s:OpenUri(uri)
-    " exec "silent !explorer " . a:uri
-    exec "silent !spotify " . a:uri
+    if has("win32")
+        call system("explorer " . a:uri)
+    elseif has("unix")
+        call system("spotify " . a:uri)
+    else
+        " TODO other
+    endif
 endfunction
 
 function! PlayTrack()
@@ -11,12 +23,26 @@ function! PlayTrack()
 endfunction
 
 function! s:CurlIntoBuffer(url)
-    " exec 'silent r!curl -s "' . a:url . '"'
+    exec 'silent r!curl -s "' . a:url . '"'
+endfunction
+
+function! s:WgetIntoBuffer(url)
     exec 'silent r!wget -qO- "' . a:url . '"'
 endfunction
 
-function! s:SearchSpot(track)
-    call s:CurlIntoBuffer(s:spotify_track_search_url . a:track)
+" It is possible to use netrw to read from network
+function! s:SearchSpotIntoBuffer(track)
+    let l:trackUri = s:spotify_track_search_url . a:track
+    if executable("curl")
+        call s:CurlIntoBuffer(l:trackUri)
+    elseif executable("wget")
+        call s:WgetIntoBuffer(l:trackUri)
+    elseif exists(":Nread")
+        let l:command = 'silent! edit! '. l:trackUri
+        exec l:command
+    else
+        " TODO Throw error
+    endif
 endfunction
 
 function! s:OpenWindow()
@@ -34,9 +60,17 @@ function! s:OpenWindow()
         silent! exec "edit " . t:bufferName
     endif
     setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile nowrap modifiable
+    " mappings
     nnoremap <buffer> <CR> :silent call PlayTrack()<CR>
     nnoremap <buffer> <2-LeftMouse> :call PlayTrack()<CR>
     nnoremap <buffer> q <C-W>q
+    " highlighting
+    syn match trackOne '.*\S\s$' display
+    syn match trackTwo '.*\s\s$' display
+    syn match headers 'Track\s*Artist\s*Release Year\s*Album'
+    hi def link trackOne Type
+    hi def link trackTwo PreProc
+    hi def link headers Comment
 endfunction
 
 function! SearchTrack(track)
@@ -44,7 +78,7 @@ function! SearchTrack(track)
     0,$d
     let cleantrack = substitute(a:track, " ", "\\\\%20", "g")
     echo "Downloading Search now"
-    call s:SearchSpot(cleantrack)
+    call s:SearchSpotIntoBuffer(cleantrack)
     silent 1d
     call s:TrackParse()
     setlocal nomodifiable
@@ -70,6 +104,7 @@ function! s:TrackParse()
         silent! %Tabularize /    
     endif
     let i = 2
+    " Add trailing whitespace for line alternate line highlighting
     while i <= last
         if i % 2 == 0
             call setline(i, getline(i) . ' ')
@@ -78,12 +113,6 @@ function! s:TrackParse()
         endif
         let i = i + 1
     endwhile
-    syn match trackOne '.*\S\s$' display
-    syn match trackTwo '.*\s\s$' display
-    syn match headers 'Track\s*Artist\s*Release Year\s*Album'
-    hi def link trackOne Type
-    hi def link trackTwo PreProc
-    hi def link headers Comment
 endfunction
 
 command! -nargs=* SpotifySearch call SearchTrack("<args>")
