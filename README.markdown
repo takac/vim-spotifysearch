@@ -3,6 +3,8 @@ Vim Spotify Search
 
 A plugin to allow you to search and play tracks from spotify right inside Vim.
 
+Make sure you have spotify running externally, then in Vim:
+
     :SpotifySearch yeezus
 
 Yields a new window with the search results
@@ -25,6 +27,11 @@ Yields a new window with the search results
 Just hit enter to have the song played by spotify.
 
 <img src="screenshot.png" height="80%" width="80%" alt="screenshot"/>
+
+### Dependencies
+
+This plugin currently requires [Tabular](https://github.com/godlygeek/tabular) for aligning the columns when
+displaying the track listing. You will need to install this through Vundle, or any of the other installation methods.
 
 ### Installation
 I recommend installing using [Vundle](https://github.com/gmarik/vundle):
