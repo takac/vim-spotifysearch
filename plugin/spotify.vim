@@ -90,22 +90,20 @@ endfunction
 function! s:TrackParse()
     silent s/{"album"/\r&/g
     silent 1d
-    call append(0, "Track    Artist    Release Year    Album")
+    call append(0, printf("%-53s %-33s %s %6s", "Track", "Artist", "Release Year", "Album"))
     silent! 2,$s/\\"//g
-    silent! 2,$s/\v.*\{"released": "(\d{4})", "href": "[^"]+", "name": "([^"]+)", "availability": \{"territories": "[^"]+"\}}, "name": "([^"]{0,45})[^"]*", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .*name": "([^"]+)"}].*/\3    \5    \1    \2\4
+    " Convert unicode characters
+    silent! 2,$s#\\u[0-9a-f]\{0,6}#\=eval('"'.submatch(0).'"')#g
+    " Format json to track list!
+    silent! 2,$s/\v.*\{"released": "(\d{4})", "href": "[^"]+", "name": "([^"]+)", "availability": \{"territories": "[^"]+"\}}, "name": "([^"]*)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .*name": "([^"]+)"}].*/\=printf("%-50.50s    %-30.30s    %-10s    %s%s", submatch(3), submatch(5), submatch(1), submatch(2), submatch(4))/
     let b:uris = []
     let i = 2
     let last = line("$")
     while i <= last
         call add(b:uris, getline(i)[-36:])
-        call setline(i, getline(i)[:-36])
+        call setline(i, getline(i)[:-37])
         let i = i + 1
     endwhile
-    " Convert unicode characters
-    silent! %s#\\u[0-9a-f]*#\=eval('"'.submatch(0).'"')#g
-    if exists(":Tabularize")
-        silent! %Tabularize /    
-    endif
     let i = 2
     " Add trailing whitespace for line alternate line highlighting
     while i <= last
