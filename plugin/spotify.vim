@@ -10,7 +10,7 @@ let s:spotify_album_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=tr
 let s:spotify_artist_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=album&uri="
 
 function! s:OpenUri(uri)
-    if has("win32")
+    if has("win32") || has("win32unix")
         call system("explorer " . a:uri)
     elseif has("unix")
         call system("spotify " . a:uri)
@@ -84,16 +84,15 @@ function! s:OpenWindow()
         let t:bufferName = "spotify_list"
         topleft new
         silent! exec "edit " . t:bufferName
-        " call s:LoadSyntaxHightlighting()
     endif
     setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile nowrap modifiable
 endfunction
 
 " Mappings
 function! s:BufferTrackMappings()
-    nnoremap <buffer> <CR> :silent call PlayTrackMapping()<CR>
-    nnoremap <buffer> <2-LeftMouse> :call PlayTrackMapping()<CR>
-    nnoremap <buffer> q <C-W>q
+    nnoremap <silent> <buffer> <CR> :silent call PlayTrackMapping()<CR>
+    nnoremap <silent> <buffer> <2-LeftMouse> :call PlayTrackMapping()<CR>
+    nnoremap <silent> <buffer> q <C-W>q
 endfunction
 
 " Highlighting
@@ -120,6 +119,7 @@ function! TrackSearch(track)
     call s:TrackParse()
     setlocal nomodifiable
     2
+    call s:LoadSyntaxHightlighting()
 endfunction
 
 function! ArtistLookup(albumUri)
@@ -135,7 +135,7 @@ function! ArtistLookup(albumUri)
     call s:BufferTrackMappings()
     setlocal nomodifiable
     2
-    return
+    call s:LoadSyntaxHightlighting()
 endfunction
 
 function! s:ArtistParse()
@@ -174,6 +174,7 @@ function! s:AlbumLookup(albumUri)
     call s:AlbumParse()
     setlocal nomodifiable
     2
+    call s:LoadSyntaxHightlighting()
 endfunction
 
 function! s:AlbumParse()
