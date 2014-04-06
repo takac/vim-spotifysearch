@@ -1,5 +1,5 @@
 " Author: Tom Cammann 
-" Version: 0.2
+" Version: 0.3
 
 if &cp || version < 700
     finish
@@ -9,7 +9,7 @@ let s:spotify_track_search_url = "http://ws.spotify.com/search/1/track.json?q="
 let s:spotify_album_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=track&uri="
 let s:spotify_artist_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=album&uri="
 
-function! s:OpenUri(uri)
+function! OpenSpotifyUri(uri)
     if has("win32") || has("win32unix")
         call system("explorer " . a:uri)
     elseif has("unix")
@@ -34,16 +34,16 @@ function! PlayTrackMapping()
         if col > 60
             call ArtistLookup(b:artistUris[ln])
         else
-            call s:OpenUri(b:trackUris[ln])
+            call OpenSpotifyUri(b:trackUris[ln])
         endif
     else
         " isTrack..
         if col > 102 
             call s:AlbumLookup(b:albumUris[ln])
-        elseif col > 54 || col < 89
+        elseif col > 54 && col < 89
             call ArtistLookup(b:artistUris[ln])
         else 
-            call s:OpenUri(b:trackUris[ln])
+            call OpenSpotifyUri(b:trackUris[ln])
         endif
     endif
 endfunction
@@ -93,6 +93,7 @@ function! s:BufferTrackMappings()
     nnoremap <silent> <buffer> <CR> :silent call PlayTrackMapping()<CR>
     nnoremap <silent> <buffer> <2-LeftMouse> :call PlayTrackMapping()<CR>
     nnoremap <silent> <buffer> q <C-W>q
+    exec 'nnoremap <silent> <buffer> s :call OpenSpotifyUri("spotify:search:' . s:search_term . '")<CR>'
 endfunction
 
 " Highlighting
@@ -109,8 +110,8 @@ function! TrackSearch(track)
     call s:OpenWindow()
     let b:isArtist = 0
     let b:isAlbum = 0
-    call s:BufferTrackMappings()
     0,$d
+    let s:search_term = substitute(a:track, " ", "+", "g")
     let cleantrack = substitute(a:track, " ", "\\\\%20", "g")
     echo "Downloading Search now"
     let l:url = s:spotify_track_search_url . l:cleantrack
@@ -119,6 +120,7 @@ function! TrackSearch(track)
     call s:TrackParse()
     setlocal nomodifiable
     2
+    call s:BufferTrackMappings()
     call s:LoadSyntaxHightlighting()
 endfunction
 
@@ -132,9 +134,9 @@ function! ArtistLookup(albumUri)
     call s:UrlIntoBuffer(l:url)
     silent 1d
     call s:ArtistParse()
-    call s:BufferTrackMappings()
     setlocal nomodifiable
     2
+    call s:BufferTrackMappings()
     call s:LoadSyntaxHightlighting()
 endfunction
 
@@ -235,6 +237,7 @@ function! s:AddTrailingWhiteSpace(start, finish)
         endif
         let i = i + 1
     endwhile
-endfunction
+endfunctio
 
 command! -nargs=* SpotifySearch call TrackSearch("<args>")
+command! -nargs=1 SpotifyOpenUri call OpenSpotifyUri("<args>")
