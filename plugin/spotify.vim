@@ -12,6 +12,8 @@ let s:spotify_artist_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=a
 function! OpenSpotifyUri(uri)
     if has("win32") || has("win32unix")
         call system("explorer " . a:uri)
+    elseif has("mac")
+        call system("open " . a:uri)
     elseif has("unix")
         call system("spotify " . a:uri)
     else
