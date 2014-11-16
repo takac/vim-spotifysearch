@@ -15,8 +15,8 @@ function! OpenSpotifyUri(uri)
     elseif has("mac")
         call system("open " . a:uri)
     elseif has("unix")
-        call system("spotify " . a:uri)
-    else
+		call system("open " . a:uri . " && sleep 1 && osascript -e 'tell application \"Finder\"' -e 'set visible of process \"Spotify\" to false' -e 'end tell'")
+	else
         " TODO others
         throw "Platform unsupported"
     endif
