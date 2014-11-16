@@ -15,7 +15,7 @@ function! OpenSpotifyUri(uri)
     elseif has("mac")
         call system("open " . a:uri)
     elseif has("unix")
-        call system("spotify " . a:uri)
+        call system("osascript -e 'tell application \"Spotify\"' -e 'play track \"".a:uri."\"' -e 'end tell'")
     else
         " TODO others
         throw "Platform unsupported"
