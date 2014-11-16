@@ -1,3 +1,0 @@
-tell application "Spotify"
-  set miniaturized of window 1 to true
-end tell
