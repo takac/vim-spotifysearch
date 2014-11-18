@@ -12,18 +12,21 @@ let s:spotify_artist_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=a
 function! OpenSpotifyUri(uri)
     if has("win32") || has("win32unix")
         call system("explorer " . a:uri)
-    elseif has("mac") || has("macunix")
-        call system("osascript -e 'tell application \"Spotify\"' -e 'play track \"" . a:uri . "\"' -e 'end tell'")
-        if v:shell_error
-            call system("open " . a:uri)
-            if v:shell_error
-                throw "Could not open spotify uri, error no " . v:shell_error
-            endif
-        endif
     elseif has("unix")
-        call system("spotify " . a:uri)
-        if v:shell_error
-            throw "Could not open spotify, error no " . v:shell_error
+        let os = system("uname -s")
+        if has("mac") || has("macunix") ||  os =~ "Darwin" || os =~ "Mac"
+            call system("osascript -e 'tell application \"Spotify\"' -e 'play track \"" . a:uri . "\"' -e 'end tell'")
+            if v:shell_error
+                call system("open " . a:uri)
+                if v:shell_error
+                    throw "Could not open spotify uri, error no " . v:shell_error
+                endif
+            endif
+        else
+            call system("spotify " . a:uri)
+            if v:shell_error
+                throw "Could not open spotify, error no " . v:shell_error
+            endif
         endif
     else
         " TODO others
