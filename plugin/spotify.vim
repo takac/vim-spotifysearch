@@ -1,4 +1,4 @@
-" Author: Tom Cammann 
+" Author: Tom Cammann
 " Version: 0.3
 
 if &cp || version < 700
@@ -12,10 +12,19 @@ let s:spotify_artist_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=a
 function! OpenSpotifyUri(uri)
     if has("win32") || has("win32unix")
         call system("explorer " . a:uri)
-    elseif has("mac")
-        call system("open " . a:uri)
+    elseif has("mac") || has("macunix")
+        call system("osascript -e 'tell application \"Spotify\"' -e 'play track \"" . a:uri . "\"' -e 'end tell'")
+        if v:shell_error
+            call system("open " . a:uri)
+            if v:shell_error
+                throw "Could not open spotify uri, error no " . v:shell_error
+            endif
+        endif
     elseif has("unix")
         call system("spotify " . a:uri)
+        if v:shell_error
+            throw "Could not open spotify, error no " . v:shell_error
+        endif
     else
         " TODO others
         throw "Platform unsupported"
@@ -40,11 +49,11 @@ function! PlayTrackMapping()
         endif
     else
         " isTrack..
-        if col > 102 
+        if col > 102
             call s:AlbumLookup(b:albumUris[ln])
         elseif col > 54 && col < 89
             call ArtistLookup(b:artistUris[ln])
-        else 
+        else
             call OpenSpotifyUri(b:trackUris[ln])
         endif
     endif
@@ -152,7 +161,7 @@ function! s:ArtistParse()
     silent! 2,$s/\v.*"name": "([^"]*)".* "href": "(spotify:album:[^"]*)".*/\1\2
     " Sometimes href and name are in the other order...
     silent! 2,$s/\v.*"href": "(spotify:album:[^"]*)".* "name": "([^"]*)".* /\2\1
-    
+
     silent! 1d
     silent! $m0
     let b:albumUris = []
@@ -210,7 +219,7 @@ function! s:TrackParse()
     " Convert unicode characters
     silent! %s#\\u[0-9a-f]\{2,6}#\=eval('"'.submatch(0).'"')#g
     " Format json to track list!
-    silent! %s/\v.*\{"released": "(\d{4})", "href": "([^"]+)", "name": "([^"]+)", "availability": \{"territories": "[^"]+"\}}, "name": "([^"]*)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .+"href": "([^"]*)".+ "name": "([^"]+)"}].*/\=printf("%-50.50s    %-30.30s    %-10s    %s%s%s%s", submatch(4), submatch(7), submatch(1), submatch(3), submatch(6), submatch(2), submatch(5))/
+    silent! %s/\v.*\{"released": "(\d{4})", "href": "([^"]+)", "name": "([^"]+)", "availability": \{"territories": "[^"]+"\}}, "name": "([^"]*)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .+"href": "([^"]*)".+ "name": "([^"]+)"}].*/\=printf("%-50.50S    %-30.30S    %-10S    %S%S%S%S", submatch(4), submatch(7), submatch(1), submatch(3), submatch(6), submatch(2), submatch(5))/
     let b:trackUris = []
     let b:albumUris = []
     let b:artistUris = []
@@ -234,7 +243,7 @@ function! s:AddTrailingWhiteSpace(start, finish)
     while i <= a:finish
         if i % 2 == 0
             call setline(i, getline(i) . ' ')
-        else 
+        else
             call setline(i, getline(i) . '  ')
         endif
         let i = i + 1
