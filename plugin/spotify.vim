@@ -9,7 +9,7 @@ let s:spotify_track_search_url = "http://ws.spotify.com/search/1/track.json?q="
 let s:spotify_album_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=track&uri="
 let s:spotify_artist_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=album&uri="
 
-function! OpenSpotifyUri(uri)
+function! SpotifyOpenUri(uri)
     if has("win32") || has("win32unix")
         call system("explorer " . a:uri)
     elseif has("unix")
@@ -48,7 +48,7 @@ function! PlayTrackMapping()
         if col > 60
             call ArtistLookup(b:artistUris[ln])
         else
-            call OpenSpotifyUri(b:trackUris[ln])
+            call SpotifyOpenUri(b:trackUris[ln])
         endif
     else
         " isTrack..
@@ -57,12 +57,12 @@ function! PlayTrackMapping()
         elseif col > 54 && col < 89
             call ArtistLookup(b:artistUris[ln])
         else
-            call OpenSpotifyUri(b:trackUris[ln])
+            call SpotifyOpenUri(b:trackUris[ln])
         endif
     endif
 endfunction
 
-function! s:CurlIntoArray(url)
+function! s:Curl(url)
     return system('curl -s "' . a:url . '"')
 endfunction
 
@@ -74,11 +74,11 @@ function! s:WgetIntoBuffer(url)
     exec 'silent r!wget -qO- "' . a:url . '"'
 endfunction
 
-function! s:UrlIntoArray(url)
+function! s:GetUrl(url)
     if executable("curl")
-        return s:CurlIntoArray(a:url)
+        return s:Curl(a:url)
     elseif executable("wget")
-        return s:WgetIntoArray(a:url)
+        return s:Wget(a:url)
     endif
 endfunction
 
@@ -119,7 +119,7 @@ function! s:BufferTrackMappings()
     nnoremap <silent> <buffer> <CR> :silent call PlayTrackMapping()<CR>
     nnoremap <silent> <buffer> <2-LeftMouse> :call PlayTrackMapping()<CR>
     nnoremap <silent> <buffer> q <C-W>q
-    exec 'nnoremap <silent> <buffer> s :call OpenSpotifyUri("spotify:search:' . s:search_term . '")<CR>'
+    exec 'nnoremap <silent> <buffer> s :call SpotifyOpenUri("spotify:search:' . s:search_term . '")<CR>'
 endfunction
 
 " Highlighting
@@ -132,7 +132,7 @@ function! s:LoadSyntaxHightlighting()
     hi def link headers Comment
 endfunction
 
-function! TrackSearch(track)
+function! SpotifyTrackSearch(track)
     if len(a:track) == 0
         echo "Please enter a search term"
         return
@@ -141,12 +141,17 @@ function! TrackSearch(track)
     let b:isArtist = 0
     let b:isAlbum = 0
     0,$d
-    let s:search_term = substitute(a:track, " ", "+", "g")
-    let cleantrack = substitute(a:track, " ", "\\\\%20", "g")
-    echo "Downloading Search now"
-    let l:url = s:spotify_track_search_url . l:cleantrack
-    let track_array = s:TrackArrayParse(s:UrlIntoArray(l:url))
-    call s:PrintTrackArray(track_array)
+    if has_key(s:cache.track_search, a:track)
+        let tracks = s:cache.track_search[a:track]
+    else
+        let s:search_term = substitute(a:track, " ", "+", "g")
+        let cleantrack = substitute(a:track, " ", "\\\\%20", "g")
+        echo "Downloading Search now"
+        let l:url = s:spotify_track_search_url . l:cleantrack
+        let tracks = s:TrackParse(s:GetUrl(l:url))
+        let s:cache.track_search[a:track] = tracks 
+    endif
+    call s:PrintTracks(tracks)
     2d
     setlocal nomodifiable
     2
@@ -154,14 +159,18 @@ function! TrackSearch(track)
     call s:LoadSyntaxHightlighting()
 endfunction
 
-function! s:TrackArrayParse(json)
+function! s:CleanString(string)
+    " remove escaped quotes
+    let clean = substitute(a:string, '\\"', '', 'g')
+    " Convert unicode characters
+    return substitute(clean, '\\u[0-9a-f]\{2,6}', "\\=eval('\"'.submatch(0).'\"')", 'g')
+endfunction
+
+function! s:TrackParse(json)
     let splitter = split(a:json, '{"album"\zs')[1:]
     let clean = []
     for item in splitter
-        " remove escaped quotes
-        let item = substitute(item, '\\"', '', 'g')
-        " Convert unicode characters
-        let item = substitute(item, '\\u[0-9a-f]\{2,6}', "\\=eval('\"'.submatch(0).'\"')", 'g')
+        let item = s:CleanString(item)
         " Format json to track list!
         " 1: relase year, 2: album uri, 3: album name, 4: territory
         " 5: track name, 6: track uri, 7: artist uri, 8: artist name
@@ -173,12 +182,12 @@ function! s:TrackArrayParse(json)
     return clean
 endfunction
 
-function! s:PrintTrackArray(track_array)
+function! s:PrintTracks(tracks)
     let b:trackUris = []
     let b:albumUris = []
     let b:artistUris = []
     call append(0, printf("%-53s %-33s %s %6s", "Track", "Artist", "Release Year", "Album"))
-    for track in a:track_array
+    for track in a:tracks
         call add(b:trackUris, track[6])
         call add(b:albumUris, track[2])
         call add(b:artistUris, track[7])
@@ -237,55 +246,46 @@ function! s:AlbumLookup(albumUri)
     let b:isAlbum = 1
     0,$d
     echo "Downloading Search now"
-    let l:url = s:spotify_album_lookup_url . a:albumUri
-    call s:UrlIntoBuffer(l:url)
-    let g:album_array = s:AlbumArrayParse(s:UrlIntoArray(l:url))
-    " call s:PrintAlbumArray(track_array)
-    silent 1d
-    call s:AlbumParse()
+    if has_key(s:cache.album, a:albumUri)
+        let album = s:cache.album[a:albumUri]
+    else
+        let l:url = s:spotify_album_lookup_url . a:albumUri
+        let album = s:AlbumParse(s:GetUrl(l:url))
+        let s:cache.album[a:albumUri] = album
+    endif
+
+    call s:PrintAlbum(album)
     setlocal nomodifiable
     2
     call s:LoadSyntaxHightlighting()
 endfunction
 
-function! s:AlbumArrayParse(json)
-    let splitter = split(a:json, '{"available"\zs')
-    let clean = []
-    for item in splitter
-        " remove escaped quotes
-        let item = substitute(item, '\\"', '', 'g')
-        " Convert unicode characters
-        let item = substitute(item, '\\u[0-9a-f]\{2,6}', eval('"'.submatch(0).'"'), 'g')
-        " Format json to track list!
-        " 1: relase year, 2: album uri, 3: album name, 4: territory
-        " 5: track name, 6: track uri, 7: artist uri, 8: artist name
-        let contents = matchlist(item, '\v.*\{"released": "(\d{4})", "href": "([^"]+)", "name": "([^"]+)", "availability": \{"territories": "([^"]+)"\}}, "name": "([^"]*)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .+"href": "([^"]*)".+ "name": "([^"]+)"}].*')
-        if s:AvailableInTerritory(split(contents[4]))
-            call add(clean, contents)
-        endif
+function! s:AlbumParse(json)
+    let split_tracks = split(a:json, '{"available"\zs')
+    "1: name, 2: artist, 3: year
+    let info = matchlist(split_tracks[0], '\v.*"name": "([^"]*)".* "artist": "([^"]*)".* "released": "(\d{4})".*')
+    let album = {}
+    let tracks = []
+    for item in split_tracks[1:]
+        let item = s:CleanString(item)
+        let track = matchlist(item, '\v.* "href": "([^"]{36})".* "artists": \[.+"href": "([^"]*)".+ "name": "([^"]*).*\].* "name": "([^"]+)".*"')
+        " 1: uri track, 2: uri artist, 3: artist name, 4: track name
+        call add(tracks, track)
     endfor
-    return clean
+    return {"tracks": tracks, "name": info[1], "year": info[3], "artist": info[2]}
 endfunction
 
-function! s:AlbumParse()
-    silent! s/\ze{"available"/\r/g
-    silent! %s/\\"//g
-    silent! %s#\\u[0-9a-f]\{2,6}#\=eval('"'.submatch(0).'"')#g
-    silent! 1s/\v.*"name": "([^"]*)".* "artist": "([^"]*)".* "released": "(\d{4})".*/\1 - \2 - \3
-    " groups - track uri, artist uri, artist name, track name
-    silent! 2,$s/\v.* "href": "([^"]{36})".* "artists": \[.+"href": "([^"]*)".+ "name": "([^"]*).*\].* "name": "([^"]+)".*/\=printf("%-60.60s %s%s%s", submatch(4), submatch(3), submatch(2), submatch(1)) 
+function! s:PrintAlbum(album)
     let b:trackUris = []
     let b:artistUris = []
-    let i = 2
-    let last = line("$")
-    while i <= last
-        let line = getline(i)
-        call add(b:trackUris, line[-36:])
-        call add(b:artistUris, line[-73:-37])
-        call setline(i, line[:-74])
-        let i = i + 1
-    endwhile
-    call s:AddTrailingWhiteSpace(2, l:last)
+    call append(0, printf("%S - %S %S", a:album["name"], a:album["artist"], a:album["year"]))
+    for track in a:album["tracks"]
+        call append("$", printf("%-60.60s %s", track[4], track[3]))
+        call add(b:trackUris, track[1])
+        call add(b:artistUris, track[2])
+    endfor
+    2d
+    call s:AddTrailingWhiteSpace(1, line("$"))
 endfunction
 
 " Add trailing whitespace for line alternate line highlighting
@@ -301,5 +301,12 @@ function! s:AddTrailingWhiteSpace(start, finish)
     endwhile
 endfunction
 
-command! -nargs=* SpotifySearch call TrackSearch("<args>")
-command! -nargs=1 SpotifyOpenUri call OpenSpotifyUri("<args>")
+function! s:SpotifyClearCache()
+    let s:cache = {"album": {}, "artist": {}, "track": {}, "track_search": {}}
+endfunction
+
+call s:SpotifyClearCache()
+
+command! -nargs=* SpotifySearch call SpotifyTrackSearch("<args>")
+command! -nargs=1 SpotifyOpenUri call SpotifyOpenUri("<args>")
+command! -nargs=0 SpotifyClearCache call SpotifyClearCache()
