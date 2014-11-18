@@ -222,7 +222,11 @@ function! s:TrackParse()
     " Convert unicode characters
     silent! %s#\\u[0-9a-f]\{2,6}#\=eval('"'.submatch(0).'"')#g
     " Format json to track list!
-    silent! %s/\v.*\{"released": "(\d{4})", "href": "([^"]+)", "name": "([^"]+)", "availability": \{"territories": "[^"]+"\}}, "name": "([^"]*)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .+"href": "([^"]*)".+ "name": "([^"]+)"}].*/\=printf("%-50.50S    %-30.30S    %-10S    %S%S%S%S", submatch(4), submatch(7), submatch(1), submatch(3), submatch(6), submatch(2), submatch(5))/
+    let fmt_string = "%-50.50s    %-30.30s    %-10s    %s%s%s%s"
+    if has("multi_byte")
+        let fmt_string = toupper(fmt_string)
+    endif
+    silent! %s/\v.*\{"released": "(\d{4})", "href": "([^"]+)", "name": "([^"]+)", "availability": \{"territories": "[^"]+"\}}, "name": "([^"]*)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .+"href": "([^"]*)".+ "name": "([^"]+)"}].*/\=printf(fmt_string, submatch(4), submatch(7), submatch(1), submatch(3), submatch(6), submatch(2), submatch(5))/
     let b:trackUris = []
     let b:albumUris = []
     let b:artistUris = []
