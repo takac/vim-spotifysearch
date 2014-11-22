@@ -35,6 +35,8 @@ function! SpotifyOpenUri(uri)
 endfunction
 
 function! PlayTrackMapping()
+    call s:FollowDict.follow(line("."), virtcol("."))
+    return
     " Not on title line
     if line(".") == 1
         return
@@ -45,20 +47,6 @@ function! PlayTrackMapping()
     if b:isArtist
         call s:AlbumLookup(b:albumUris[ln])
     elseif b:isAlbum
-        if col > 60
-            call ArtistLookup(b:artistUris[ln])
-        else
-            call SpotifyOpenUri(b:trackUris[ln])
-        endif
-    else
-        " isTrack..
-        if col > 102
-            call s:AlbumLookup(b:albumUris[ln])
-        elseif col > 54 && col < 89
-            call ArtistLookup(b:artistUris[ln])
-        else
-            call SpotifyOpenUri(b:trackUris[ln])
-        endif
     endif
 endfunction
 
@@ -111,11 +99,11 @@ function! s:OpenWindow()
         topleft new
         silent! exec "edit " . t:bufferName
     endif
-    setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile nowrap modifiable
+    setlocal buftype=nofile nobuflisted noswapfile nowrap modifiable
 endfunction
 
 " Mappings
-function! s:BufferTrackMappings()
+function! s:BufferTrackSearchMappings()
     nnoremap <silent> <buffer> <CR> :silent call PlayTrackMapping()<CR>
     nnoremap <silent> <buffer> <2-LeftMouse> :call PlayTrackMapping()<CR>
     nnoremap <silent> <buffer> q <C-W>q
@@ -134,13 +122,11 @@ endfunction
 
 function! SpotifyTrackSearch(track)
     if len(a:track) == 0
-        echo "Please enter a search term"
+        call s:OpenWindow()
         return
     endif
-    call s:OpenWindow()
     let b:isArtist = 0
     let b:isAlbum = 0
-    0,$d
     if has_key(s:cache.track_search, a:track)
         let tracks = s:cache.track_search[a:track]
     else
@@ -148,14 +134,20 @@ function! SpotifyTrackSearch(track)
         let cleantrack = substitute(a:track, " ", "\\\\%20", "g")
         echo "Downloading Search now"
         let l:url = s:spotify_track_search_url . l:cleantrack
-        let tracks = s:TrackParse(s:GetUrl(l:url))
-        let s:cache.track_search[a:track] = tracks 
+        let tracks = s:TrackSearchParse(s:GetUrl(l:url))
+        let s:cache.track_search[a:track] = tracks
     endif
+    if len(tracks) == 0
+        echo "No tracks could be found"
+        return
+    endif
+    call s:OpenWindow()
+    0,$d
     call s:PrintTracks(tracks)
     2d
     setlocal nomodifiable
     2
-    call s:BufferTrackMappings()
+    call s:BufferTrackSearchMappings()
     call s:LoadSyntaxHightlighting()
 endfunction
 
@@ -166,33 +158,67 @@ function! s:CleanString(string)
     return substitute(clean, '\\u[0-9a-f]\{2,6}', "\\=eval('\"'.submatch(0).'\"')", 'g')
 endfunction
 
-function! s:TrackParse(json)
+function! s:TrackSearchParse(json)
     let splitter = split(a:json, '{"album"\zs')[1:]
     let clean = []
+    let track_list = []
     for item in splitter
         let item = s:CleanString(item)
-        " Format json to track list!
+        " Format JSON to track list
         " 1: relase year, 2: album uri, 3: album name, 4: territory
         " 5: track name, 6: track uri, 7: artist uri, 8: artist name
-        let contents = matchlist(item, '\v.*\{"released": "(\d{4})", "href": "([^"]+)", "name": "([^"]+)", "availability": \{"territories": "([^"]+)"\}}, "name": "([^"]*)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .+"href": "([^"]*)".+ "name": "([^"]+)"}].*')
-        if s:AvailableInTerritory(split(contents[4]))
-            call add(clean, contents)
+        let contents = matchlist(item, '\v.*\{"released": "(\d{4})", "href": "([^"]+)", "name": "([^"]+)", "availability": \{"territories": "([^"]*)"\}\}, "name": "([^"]*)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .+"href": "([^"]*)".+ "name": "([^"]+)"}].*')
+        if len(contents) == 10
+            if s:AvailableInTerritory(split(contents[4]))
+                call add(clean, contents)
+            endif
+        else
+            throw "Failed to match " . item . " LENGTH = " . len(contents)
         endif
+        let track = {
+                    \ "year": contents[1],
+                    \ "album": { "uri": contents[2], "name": contents[3] },
+                    \ "territories": split(contents[4]),
+                    \ "name": contents[5],
+                    \ "uri": contents[6],
+                    \ "artist": { "uri": contents[7], "name": contents[8] }
+                    \ }
+        call add(track_list, track)
     endfor
-    return clean
+    return track_list
+endfunction
+
+function! TrackFollow(line_number, column) dict
+    " title line
+    if a:line_number == 0
+        return
+    endif
+    let track = self.tracks[a:line_number - 2]
+    if a:column > 102
+        call s:AlbumLookup(track.album.uri)
+    elseif a:column > 54 && a:column < 89
+        call ArtistLookup(track.artist.uri)
+    else
+        call SpotifyOpenUri(track.uri)
+    endif
+endfunction
+
+function! MakeTrackFollower(tracks)
+    let closure = { 'tracks': a:tracks }
+    let closure.follow = function("TrackFollow")
+    return closure
 endfunction
 
 function! s:PrintTracks(tracks)
-    let b:trackUris = []
-    let b:albumUris = []
-    let b:artistUris = []
+    let shown_tracks = []
     call append(0, printf("%-53s %-33s %s %6s", "Track", "Artist", "Release Year", "Album"))
     for track in a:tracks
-        call add(b:trackUris, track[6])
-        call add(b:albumUris, track[2])
-        call add(b:artistUris, track[7])
-        call append("$", printf("%-50.50S    %-30.30S    %-10S    %S", track[5], track[8], track[1], track[3]))
+        if s:AvailableInTerritory(track.territories)
+            call add(shown_tracks, track)
+            call append("$", printf("%-50.50S    %-30.30S    %-10S    %S", track.name, track.artist.name, track.year, track.album.name))
+        endif
     endfor
+    let s:FollowDict = MakeTrackFollower(shown_tracks)
     call s:AddTrailingWhiteSpace(1, line("$"))
 endfunction
 
@@ -212,7 +238,7 @@ function! ArtistLookup(albumUri)
     call s:ArtistParse()
     setlocal nomodifiable
     2
-    call s:BufferTrackMappings()
+    call s:BufferTrackSearchMappings()
     call s:LoadSyntaxHightlighting()
 endfunction
 
@@ -258,6 +284,26 @@ function! s:AlbumLookup(albumUri)
     setlocal nomodifiable
     2
     call s:LoadSyntaxHightlighting()
+    let s:FollowDict = MakeAlbumFollower(album)
+endfunction
+
+function! AlbumFollow(line_number, column) dict
+    " title line
+    if a:line_number == 0
+        return
+    endif
+    let track = self.album.tracks[a:line_number - 2]
+    if a:column > 60
+        call ArtistLookup(track.artist.uri)
+    else
+        call SpotifyOpenUri(track.uri)
+    endif
+endfunction
+
+function! MakeAlbumFollower(album)
+    let closure = { 'album': a:album }
+    let closure.follow = function("AlbumFollow")
+    return closure
 endfunction
 
 function! s:AlbumParse(json)
@@ -268,21 +314,23 @@ function! s:AlbumParse(json)
     let tracks = []
     for item in split_tracks[1:]
         let item = s:CleanString(item)
-        let track = matchlist(item, '\v.* "href": "([^"]{36})".* "artists": \[.+"href": "([^"]*)".+ "name": "([^"]*).*\].* "name": "([^"]+)".*"')
-        " 1: uri track, 2: uri artist, 3: artist name, 4: track name
+        let contents = matchlist(item, '\v.* "href": "([^"]{36})".* "artists": \[.+"href": "([^"]*)".+ "name": "([^"]*).*\].* "name": "([^"]+)".*"')
+        let track = {
+                    \ "uri": contents[1],
+                    \ "artist": { "uri": contents[2], "name": contents[3] },
+                    \ "name": contents[4]
+                    \ }
         call add(tracks, track)
     endfor
-    return {"tracks": tracks, "name": info[1], "year": info[3], "artist": info[2]}
+    return { "tracks": tracks, "name": info[1], "year": info[3], "artist": { "name": info[2] } }
 endfunction
 
 function! s:PrintAlbum(album)
     let b:trackUris = []
     let b:artistUris = []
-    call append(0, printf("%S - %S %S", a:album["name"], a:album["artist"], a:album["year"]))
-    for track in a:album["tracks"]
-        call append("$", printf("%-60.60s %s", track[4], track[3]))
-        call add(b:trackUris, track[1])
-        call add(b:artistUris, track[2])
+    call append(0, printf("%S - %S %S", a:album.name, a:album.artist.name, a:album.year))
+    for track in a:album.tracks
+        call append("$", printf("%-60.60s %s", track.name, track.artist.name))
     endfor
     2d
     call s:AddTrailingWhiteSpace(1, line("$"))
