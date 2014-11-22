@@ -1,5 +1,5 @@
 " Author: Tom Cammann
-" Version: 0.3
+" Version: 0.4
 
 if &cp || version < 700
     finish
@@ -36,30 +36,10 @@ endfunction
 
 function! PlayTrackMapping()
     call s:FollowDict.follow(line("."), virtcol("."))
-    return
-    " Not on title line
-    if line(".") == 1
-        return
-    endif
-    let col = virtcol(".")
-    let ln = line(".") - 2
-
-    if b:isArtist
-        call s:AlbumLookup(b:albumUris[ln])
-    elseif b:isAlbum
-    endif
 endfunction
 
 function! s:Curl(url)
     return system('curl -s "' . a:url . '"')
-endfunction
-
-function! s:CurlIntoBuffer(url)
-    exec 'silent r!curl -s "' . a:url . '"'
-endfunction
-
-function! s:WgetIntoBuffer(url)
-    exec 'silent r!wget -qO- "' . a:url . '"'
 endfunction
 
 function! s:GetUrl(url)
@@ -67,21 +47,6 @@ function! s:GetUrl(url)
         return s:Curl(a:url)
     elseif executable("wget")
         return s:Wget(a:url)
-    endif
-endfunction
-
-function! s:UrlIntoBuffer(url)
-    if executable("curl")
-        call s:CurlIntoBuffer(a:url)
-    elseif executable("wget")
-        call s:WgetIntoBuffer(a:url)
-    elseif exists(":Nread")
-        throw "No supported yet.."
-        " Use netrw to read from network
-        let l:command = 'silent! edit! '. a:url
-        exec l:command
-    else
-        throw "No viable method for calling json api"
     endif
 endfunction
 
@@ -144,7 +109,6 @@ function! SpotifyTrackSearch(track)
     call s:OpenWindow()
     0,$d
     call s:PrintTracks(tracks)
-    2d
     setlocal nomodifiable
     2
     call s:BufferTrackSearchMappings()
@@ -153,28 +117,18 @@ endfunction
 
 function! s:CleanString(string)
     " remove escaped quotes
-    let clean = substitute(a:string, '\\"', '', 'g')
+    let clean = substitute(a:string, '\\"', '"', 'g')
+    let clean = substitute(a:string, '\\/', '/', 'g')
     " Convert unicode characters
     return substitute(clean, '\\u[0-9a-f]\{2,6}', "\\=eval('\"'.submatch(0).'\"')", 'g')
 endfunction
 
 function! s:TrackSearchParse(json)
     let splitter = split(a:json, '{"album"\zs')[1:]
-    let clean = []
     let track_list = []
     for item in splitter
         let item = s:CleanString(item)
-        " Format JSON to track list
-        " 1: relase year, 2: album uri, 3: album name, 4: territory
-        " 5: track name, 6: track uri, 7: artist uri, 8: artist name
         let contents = matchlist(item, '\v.*\{"released": "(\d{4})", "href": "([^"]+)", "name": "([^"]+)", "availability": \{"territories": "([^"]*)"\}\}, "name": "([^"]*)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .+"href": "([^"]*)".+ "name": "([^"]+)"}].*')
-        if len(contents) == 10
-            if s:AvailableInTerritory(split(contents[4]))
-                call add(clean, contents)
-            endif
-        else
-            throw "Failed to match " . item . " LENGTH = " . len(contents)
-        endif
         let track = {
                     \ "year": contents[1],
                     \ "album": { "uri": contents[2], "name": contents[3] },
@@ -211,7 +165,7 @@ endfunction
 
 function! s:PrintTracks(tracks)
     let shown_tracks = []
-    call append(0, printf("%-53s %-33s %s %6s", "Track", "Artist", "Release Year", "Album"))
+    call setline(1, printf("%-53s %-33s %s %6s", "Track", "Artist", "Release Year", "Album"))
     for track in a:tracks
         if s:AvailableInTerritory(track.territories)
             call add(shown_tracks, track)
@@ -223,68 +177,81 @@ function! s:PrintTracks(tracks)
 endfunction
 
 function! s:AvailableInTerritory(territories)
-   return index(a:territories, "GB") >= 0
+   return len(a:territories) == 0 || index(a:territories, "GB") >= 0
 endfunction
 
 function! ArtistLookup(albumUri)
-    call s:OpenWindow()
-    let b:isArtist = 1
-    let b:isAlbum = 0
-    0,$d
     echo "Downloading Search now"
     let l:url = s:spotify_artist_lookup_url . a:albumUri
-    call s:UrlIntoBuffer(l:url)
-    silent 1d
-    call s:ArtistParse()
+    let artist = s:ArtistParse(s:GetUrl(l:url))
+    call s:OpenWindow()
+    0,$d
+    call s:PrintArtist(artist)
     setlocal nomodifiable
     2
-    call s:BufferTrackSearchMappings()
     call s:LoadSyntaxHightlighting()
 endfunction
 
-function! s:ArtistParse()
-    silent! s/\ze{"album":/\r/g
-    silent! %s/\\"//g
-    silent! %s#\\u[0-9a-f]\{2,6}#\=eval('"'.submatch(0).'"')#g
-    " Extract Artist Name
-    silent! $s/\v(.*) "name": "([^"]*)".*/\1\r\2 - Albums
-    " Parse Albums
-    silent! 2,$s/\v.*"name": "([^"]*)".* "href": "(spotify:album:[^"]*)".*/\1\2
-    " Sometimes href and name are in the other order...
-    silent! 2,$s/\v.*"href": "(spotify:album:[^"]*)".* "name": "([^"]*)".* /\2\1
+function! s:ArtistParse(json)
+    let split_albums = split(a:json, '{"album"\zs')
+    " Extract Artist Name from last line
+    let name = matchlist(s:CleanString(split_albums[-1]), '\v.* "name": "([^"]*)".*')[1]
+    let albums = []
+    for item in split_albums[1:]
+        let item = s:CleanString(item)
+        let contents = matchlist(item, '\v.*"name": "([^"]+)".* "href": "(spotify:album:[^"]+)", "availability": \{"territories": "([^"]*)"\}', 0, 1)[0:3]
+        " Sometimes href and name are in the other order...
+        if len(contents) != 4
+            let matched = matchlist(item, '\v.*"href": "(spotify:album:[^"]*)", "availability": \{"territories": "([^"]*)"\}, "name": "([^"]*)".* ')[0:3]
+            let contents = [matched[0], matched[3], matched[1], matched[2]]
+        endif
+        let album = { 'name' : contents[1], 'uri': contents[2], 'territories': split(contents[3]) }
+        call add(albums, album)
+    endfor
+    return { "albums": albums, "name": name }
+endfunction
 
-    silent! 1d
-    silent! $m0
-    let b:albumUris = []
-    let i = 2
-    let last = line("$")
-    while i <= last
-        let line = getline(i)
-        call add(b:albumUris, line[-36:])
-        call setline(i, line[:-37])
-        let i = i + 1
-    endwhile
+function! s:PrintArtist(artist)
+    call setline(1, printf("%S", a:artist.name))
+    let shown_albums = []
+    for album in a:artist.albums
+        if s:AvailableInTerritory(album.territories)
+            call add(shown_albums, album)
+            call append("$", printf("%S", album.name))
+        endif
+    endfor
+    let s:FollowDict = s:MakeArtistFollower(shown_albums)
+    call s:AddTrailingWhiteSpace(1, line("$"))
+endfunction
+
+function! ArtistFollow(line_number, column) dict
+    " title line
+    if a:line_number == 0
+        return
+    endif
+    call s:AlbumLookup(self.albums[a:line_number - 1].uri)
+endfunction
+
+function! s:MakeArtistFollower(albums)
+    let closure = { 'albums': a:albums }
+    let closure.follow = function("ArtistFollow")
+    return closure
 endfunction
 
 function! s:AlbumLookup(albumUri)
-    call s:OpenWindow()
-    let b:isArtist = 0
-    let b:isAlbum = 1
-    0,$d
     echo "Downloading Search now"
-    if has_key(s:cache.album, a:albumUri)
-        let album = s:cache.album[a:albumUri]
-    else
+    let l:album = {}
+    if ! has_key(s:cache.album, a:albumUri)
         let l:url = s:spotify_album_lookup_url . a:albumUri
-        let album = s:AlbumParse(s:GetUrl(l:url))
-        let s:cache.album[a:albumUri] = album
+        let s:cache.album[a:albumUri] = s:AlbumParse(s:GetUrl(l:url))
     endif
 
-    call s:PrintAlbum(album)
+    call s:OpenWindow()
+    0,$d
+    call s:PrintAlbum(s:cache.album[a:albumUri])
     setlocal nomodifiable
     2
     call s:LoadSyntaxHightlighting()
-    let s:FollowDict = MakeAlbumFollower(album)
 endfunction
 
 function! AlbumFollow(line_number, column) dict
@@ -300,7 +267,7 @@ function! AlbumFollow(line_number, column) dict
     endif
 endfunction
 
-function! MakeAlbumFollower(album)
+function! s:MakeAlbumFollower(album)
     let closure = { 'album': a:album }
     let closure.follow = function("AlbumFollow")
     return closure
@@ -309,7 +276,7 @@ endfunction
 function! s:AlbumParse(json)
     let split_tracks = split(a:json, '{"available"\zs')
     "1: name, 2: artist, 3: year
-    let info = matchlist(split_tracks[0], '\v.*"name": "([^"]*)".* "artist": "([^"]*)".* "released": "(\d{4})".*')
+    let info = matchlist(s:CleanString(split_tracks[0]), '\v.*"name": "([^"]*)".* "artist": "([^"]*)".* "released": "(\d{4})".*')
     let album = {}
     let tracks = []
     for item in split_tracks[1:]
@@ -326,13 +293,11 @@ function! s:AlbumParse(json)
 endfunction
 
 function! s:PrintAlbum(album)
-    let b:trackUris = []
-    let b:artistUris = []
-    call append(0, printf("%S - %S %S", a:album.name, a:album.artist.name, a:album.year))
+    call setline(1, printf("%S - %S %S", a:album.name, a:album.artist.name, a:album.year))
     for track in a:album.tracks
         call append("$", printf("%-60.60s %s", track.name, track.artist.name))
     endfor
-    2d
+    let s:FollowDict = s:MakeAlbumFollower(a:album)
     call s:AddTrailingWhiteSpace(1, line("$"))
 endfunction
 
