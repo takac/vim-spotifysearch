@@ -277,6 +277,7 @@ function! s:AlbumParse(json)
     let split_tracks = split(a:json, '{"available"\zs')
     "1: name, 2: artist, 3: year
     let info = matchlist(s:CleanString(split_tracks[0]), '\v.*"name": "([^"]*)".* "artist": "([^"]*)".* "released": "(\d{4})".*')
+    let album_uri = matchlist(split_tracks[-1], '\v"href": "(spotify:album:.{22})"')[1]
     let album = {}
     let tracks = []
     for item in split_tracks[1:]
@@ -289,7 +290,7 @@ function! s:AlbumParse(json)
                     \ }
         call add(tracks, track)
     endfor
-    return { "tracks": tracks, "name": info[1], "year": info[3], "artist": { "name": info[2] } }
+    return { "tracks": tracks, "name": info[1], "year": info[3], "artist": { "name": info[2] }, "uri": album_uri }
 endfunction
 
 function! s:PrintAlbum(album)
