@@ -92,16 +92,13 @@ function! SpotifyTrackSearch(track)
     endif
     let b:isArtist = 0
     let b:isAlbum = 0
-    if has_key(s:cache.track_search, a:track)
-        let tracks = s:cache.track_search[a:track]
-    else
+    if ! has_key(s:cache.track_search, a:track)
         let s:search_term = substitute(a:track, " ", "+", "g")
         let cleantrack = substitute(a:track, " ", "\\\\%20", "g")
-        echo "Downloading Search now"
         let l:url = s:spotify_track_search_url . l:cleantrack
-        let tracks = s:TrackSearchParse(s:GetUrl(l:url))
-        let s:cache.track_search[a:track] = tracks
+        let s:cache.track_search[a:track] = s:TrackSearchParse(s:GetUrl(l:url))
     endif
+    let tracks = s:cache.track_search[a:track]
     if len(tracks) == 0
         echo "No tracks could be found"
         return
@@ -117,8 +114,8 @@ endfunction
 
 function! s:CleanString(string)
     " remove escaped quotes
-    let clean = substitute(a:string, '\\"', '"', 'g')
-    let clean = substitute(a:string, '\\/', '/', 'g')
+    let clean = substitute(a:string, '\\"', '', 'g')
+    let clean = substitute(clean, '\\/', '/', 'g')
     " Convert unicode characters
     return substitute(clean, '\\u[0-9a-f]\{2,6}', "\\=eval('\"'.submatch(0).'\"')", 'g')
 endfunction
@@ -180,10 +177,12 @@ function! s:AvailableInTerritory(territories)
    return len(a:territories) == 0 || index(a:territories, "GB") >= 0
 endfunction
 
-function! ArtistLookup(albumUri)
-    echo "Downloading Search now"
-    let l:url = s:spotify_artist_lookup_url . a:albumUri
-    let artist = s:ArtistParse(s:GetUrl(l:url))
+function! ArtistLookup(artist_uri)
+    if ! has_key(s:cache.artist, a:artist_uri)
+        let l:url = s:spotify_artist_lookup_url . a:artist_uri
+        let s:cache.artist[a:artist_uri] = s:ArtistParse(s:GetUrl(l:url))
+    endif
+    let artist = s:cache.artist[a:artist_uri]
     call s:OpenWindow()
     0,$d
     call s:PrintArtist(artist)
