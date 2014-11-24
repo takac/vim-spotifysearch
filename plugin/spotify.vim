@@ -1,5 +1,5 @@
 " Author: Tom Cammann
-" Version: 0.4
+" Version: 0.5
 
 if &cp || version < 700
     finish
@@ -9,37 +9,51 @@ let s:spotify_track_search_url = "http://ws.spotify.com/search/1/track.json?q="
 let s:spotify_album_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=track&uri="
 let s:spotify_artist_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=album&uri="
 
-function! SpotifyOpenUri(uri)
+
+function! s:GetOS()
     if has("win32") || has("win32unix")
-        call system("explorer " . a:uri)
+        return "Windows"
     elseif has("unix")
-        let os = system("uname -s")
+        let os = s:SystemCallWrapper("uname -s")
         if has("mac") || has("macunix") ||  os =~ "Darwin" || os =~ "Mac"
-            call system("osascript -e 'tell application \"Spotify\"' -e 'play track \"" . a:uri . "\"' -e 'end tell'")
-            if v:shell_error
-                call system("open " . a:uri)
-                if v:shell_error
-                    throw "Could not open spotify uri, error no " . v:shell_error
-                endif
-            endif
+            return "Mac"
         else
-            call system("spotify " . a:uri)
-            if v:shell_error
-                throw "Could not open spotify, error no " . v:shell_error
-            endif
+            return "Linux"
         endif
     else
-        " TODO others
         throw "Platform unsupported"
     endif
 endfunction
 
-function! PlayTrackMapping()
-    call s:FollowDict.follow(line("."), virtcol("."))
+function! s:SystemCallWrapper(command)
+    let result = system(a:command)
+    if v:shell_error
+        throw "Non zero exit code [" . v:shell_error . "] from: " . a:command
+    endif
+    return result
+endfunction
+
+function! MacUriOpener(uri, ...)
+    let in_context = a:0 > 0 ? ' in context "' . a:1 . '"' : ''
+    call s:SystemCallWrapper("osascript -e 'tell application \"Spotify\"'"
+                \ . " -e 'play track \"" . a:uri . "\"" . in_context . "' -e 'end tell'")
+endfunction
+
+function! LinuxUriOpener(uri, ...)
+    " TODO: Update to use DBUS
+    call s:SystemCallWrapper("spotify " . a:uri)
+endfunction
+
+function! WindowsUriOpener(uri, ...)
+    call s:SystemCallWrapper("explorer " . a:uri)
+endfunction
+
+function! FollowMapping()
+    call b:FollowDict.follow(line("."), virtcol("."))
 endfunction
 
 function! s:Curl(url)
-    return system('curl -s "' . a:url . '"')
+    return s:SystemCallWrapper('curl -s "' . a:url . '"')
 endfunction
 
 function! s:GetUrl(url)
@@ -64,15 +78,15 @@ function! s:OpenWindow()
         topleft new
         silent! exec "edit " . t:bufferName
     endif
-    setlocal buftype=nofile nobuflisted noswapfile nowrap modifiable
+    setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile nowrap modifiable
 endfunction
 
 " Mappings
 function! s:BufferTrackSearchMappings()
-    nnoremap <silent> <buffer> <CR> :silent call PlayTrackMapping()<CR>
-    nnoremap <silent> <buffer> <2-LeftMouse> :call PlayTrackMapping()<CR>
+    nnoremap <silent> <buffer> <CR> :silent call FollowMapping()<CR>
+    nnoremap <silent> <buffer> <2-LeftMouse> :call FollowMapping()<CR>
     nnoremap <silent> <buffer> q <C-W>q
-    exec 'nnoremap <silent> <buffer> s :call SpotifyOpenUri("spotify:search:' . s:search_term . '")<CR>'
+    " exec 'nnoremap <silent> <buffer> s :call SpotifyOpenTrackUri("spotify:search:' . s:search_term . '")<CR>'
 endfunction
 
 " Highlighting
@@ -85,6 +99,7 @@ function! s:LoadSyntaxHightlighting()
     hi def link headers Comment
 endfunction
 
+" TODO: check if uri and open with spotify if uri
 function! SpotifyTrackSearch(track)
     if len(a:track) == 0
         call s:OpenWindow()
@@ -150,7 +165,7 @@ function! TrackFollow(line_number, column) dict
     elseif a:column > 54 && a:column < 89
         call ArtistLookup(track.artist.uri)
     else
-        call SpotifyOpenUri(track.uri)
+        call s:SpotifyOpenTrackUri(track.uri)
     endif
 endfunction
 
@@ -162,14 +177,14 @@ endfunction
 
 function! s:PrintTracks(tracks)
     let shown_tracks = []
-    call setline(1, printf("%-53s %-33s %s %6s", "Track", "Artist", "Release Year", "Album"))
+    call setline(1, printf("%-53S %-33S %s %6S", "Track", "Artist", "Release Year", "Album"))
     for track in a:tracks
         if s:AvailableInTerritory(track.territories)
             call add(shown_tracks, track)
             call append("$", printf("%-50.50S    %-30.30S    %-10S    %S", track.name, track.artist.name, track.year, track.album.name))
         endif
     endfor
-    let s:FollowDict = MakeTrackFollower(shown_tracks)
+    let b:FollowDict = MakeTrackFollower(shown_tracks)
     call s:AddTrailingWhiteSpace(1, line("$"))
 endfunction
 
@@ -219,7 +234,7 @@ function! s:PrintArtist(artist)
             call append("$", printf("%S", album.name))
         endif
     endfor
-    let s:FollowDict = s:MakeArtistFollower(shown_albums)
+    let b:FollowDict = s:MakeArtistFollower(shown_albums)
     call s:AddTrailingWhiteSpace(1, line("$"))
 endfunction
 
@@ -228,7 +243,7 @@ function! ArtistFollow(line_number, column) dict
     if a:line_number == 0
         return
     endif
-    call s:AlbumLookup(self.albums[a:line_number - 1].uri)
+    call s:AlbumLookup(self.albums[a:line_number - 2].uri)
 endfunction
 
 function! s:MakeArtistFollower(albums)
@@ -237,19 +252,21 @@ function! s:MakeArtistFollower(albums)
     return closure
 endfunction
 
-function! s:AlbumLookup(albumUri)
+function! s:AlbumLookup(album_uri)
     echo "Downloading Search now"
     let l:album = {}
-    if ! has_key(s:cache.album, a:albumUri)
-        let l:url = s:spotify_album_lookup_url . a:albumUri
-        let s:cache.album[a:albumUri] = s:AlbumParse(s:GetUrl(l:url))
+    if ! has_key(s:cache.album, a:album_uri)
+        let l:url = s:spotify_album_lookup_url . a:album_uri
+        let s:cache.album[a:album_uri] = s:AlbumParse(s:GetUrl(l:url))
     endif
 
     call s:OpenWindow()
     0,$d
-    call s:PrintAlbum(s:cache.album[a:albumUri])
+    call s:PrintAlbum(s:cache.album[a:album_uri])
     setlocal nomodifiable
-    2
+    keepjumps 2
+    normal m'
+    call s:BufferTrackSearchMappings()
     call s:LoadSyntaxHightlighting()
 endfunction
 
@@ -262,7 +279,7 @@ function! AlbumFollow(line_number, column) dict
     if a:column > 60
         call ArtistLookup(track.artist.uri)
     else
-        call SpotifyOpenUri(track.uri)
+        call s:SpotifyOpenTrackUri(track.uri, self.album.uri)
     endif
 endfunction
 
@@ -289,15 +306,21 @@ function! s:AlbumParse(json)
                     \ }
         call add(tracks, track)
     endfor
-    return { "tracks": tracks, "name": info[1], "year": info[3], "artist": { "name": info[2] }, "uri": album_uri }
+    return {
+           \ "tracks": tracks,
+           \ "name": info[1],
+           \ "year": info[3],
+           \ "artist": { "name": info[2] },
+           \ "uri": album_uri
+           \ }
 endfunction
 
 function! s:PrintAlbum(album)
-    call setline(1, printf("%S - %S %S", a:album.name, a:album.artist.name, a:album.year))
+    call setline(1, printf("%S - %S - %S", a:album.name, a:album.artist.name, a:album.year))
     for track in a:album.tracks
-        call append("$", printf("%-60.60s %s", track.name, track.artist.name))
+        call append("$", printf("%-60.60S %S", track.name, track.artist.name))
     endfor
-    let s:FollowDict = s:MakeAlbumFollower(a:album)
+    let b:FollowDict = s:MakeAlbumFollower(a:album)
     call s:AddTrailingWhiteSpace(1, line("$"))
 endfunction
 
@@ -320,6 +343,8 @@ endfunction
 
 call s:SpotifyClearCache()
 
-command! -nargs=* SpotifySearch call SpotifyTrackSearch("<args>")
-command! -nargs=1 SpotifyOpenUri call SpotifyOpenUri("<args>")
-command! -nargs=0 SpotifyClearCache call SpotifyClearCache()
+let s:SpotifyOpenTrackUri = function( s:GetOS() . "UriOpener")
+
+command! -nargs=* Spotify call SpotifyTrackSearch("<args>")
+" command! -nargs=1 SpotifyOpenTrackUri call SpotifyOpenTrackUri("<args>")
+" command! -nargs=0 SpotifyClearCache call SpotifyClearCache()
