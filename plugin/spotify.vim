@@ -9,6 +9,21 @@ let s:spotify_track_search_url = "http://ws.spotify.com/search/1/track.json?q="
 let s:spotify_album_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=track&uri="
 let s:spotify_artist_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=album&uri="
 
+function! s:GetCountryCode()
+    if !exists("g:spotify_country_code")
+        return 'ANY'
+        " TODO: Add after testing and user feedback
+        " -------
+        " let geoip = s:Curl("http://freegeoip.net/json/")
+        " let country_code = matchlist(geoip, '\v"country_code":"([^"]+)"')
+        " if len(country_code) >= 2 && len(country_code[1]) > 0
+        "     let g:spotify_country_code = country_code[1]
+        " else
+        "     let g:spotify_country_code = 'ANY'
+        " endif
+    endif
+    return g:spotify_country_code
+endfunction
 
 function! s:GetOS()
     if has("win32") || has("win32unix")
@@ -189,7 +204,10 @@ function! s:PrintTracks(tracks)
 endfunction
 
 function! s:AvailableInTerritory(territories)
-   return len(a:territories) == 0 || index(a:territories, "GB") >= 0
+   let country_code = s:GetCountryCode()
+   return country_code == "ANY" ||
+               \  len(a:territories) == 0 ||
+               \  index(a:territories, country_code) >= 0
 endfunction
 
 function! ArtistLookup(artist_uri)

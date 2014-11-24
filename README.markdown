@@ -5,7 +5,7 @@ A plugin to allow you to search and play tracks from spotify right inside Vim.
 
 Make sure you have spotify running externally, then in Vim:
 
-    :SpotifySearch yeezus
+    :Spotify yeezus
 
 Yields a new window with the search results
 
@@ -27,6 +27,13 @@ Yields a new window with the search results
 Just hit enter to have the song played by spotify.
 
 <img src="screenshot.png" height="80%" width="80%" alt="screenshot"/>
+
+### Region Configuration
+
+To filter the results appropriate to your region add the line below to your
+`.vimrc` with the correct country code.
+
+    let g:spotify_country_code = 'GB'
 
 ### Installation
 I recommend installing using [Vundle](https://github.com/gmarik/vundle):
