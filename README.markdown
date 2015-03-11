@@ -35,6 +35,17 @@ To filter the results appropriate to your region add the line below to your
 
     let g:spotify_country_code = 'GB'
 
+#### PlayPause, Next, Prev Keys
+
+For linux operating systems with dbus, you can map specific keys to
+play/pause, next and previous.
+
+    let g:spotify_prev_key = "<F9>"
+    let g:spotify_playpause_key = "<F10>"
+    let g:spotify_next_key = "<F11>"
+
+These mappings will only work inside the spotify list buffer.
+
 ### Installation
 I recommend installing using [Vundle](https://github.com/gmarik/vundle):
 

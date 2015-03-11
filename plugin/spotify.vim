@@ -9,6 +9,7 @@ let s:spotify_track_search_url = "http://ws.spotify.com/search/1/track.json?q="
 let s:spotify_album_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=track&uri="
 let s:spotify_artist_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=album&uri="
 
+
 function! s:GetCountryCode()
     if !exists("g:spotify_country_code")
         return 'ANY'
@@ -101,6 +102,15 @@ function! s:BufferTrackSearchMappings()
     nnoremap <silent> <buffer> <CR> :silent call FollowMapping()<CR>
     nnoremap <silent> <buffer> <2-LeftMouse> :call FollowMapping()<CR>
     nnoremap <silent> <buffer> q <C-W>q
+    if exists("g:spotify_prev_key")
+        exec 'nnoremap <silent> <buffer> ' . g:spotify_prev_key . ' :call system("dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Prev")<CR>'
+    endif
+    if exists("g:spotify_next_key")
+        exec 'nnoremap <silent> <buffer> ' . g:spotify_next_key . ' :call system("dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Next")<CR>'
+    endif
+    if exists("g:spotify_playpause_key")
+        exec 'nnoremap <silent> <buffer> ' . g:spotify_playpause_key . ' :call system("dbus-send --print-reply --dest=org.mpris.MediaPlayer2.spotify /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.PlayPause")<CR>'
+    endif
     " exec 'nnoremap <silent> <buffer> s :call SpotifyOpenTrackUri("spotify:search:' . s:search_term . '")<CR>'
 endfunction
 
