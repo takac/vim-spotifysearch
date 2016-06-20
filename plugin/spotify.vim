@@ -5,11 +5,6 @@ if &cp || version < 700
     finish
 end
 
-let s:spotify_track_search_url = "http://ws.spotify.com/search/1/track.json?q="
-let s:spotify_album_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=track&uri="
-let s:spotify_artist_lookup_url = "http://ws.spotify.com/lookup/1/.json?extras=album&uri="
-
-
 function! s:GetCountryCode()
     if !exists("g:spotify_country_code")
         return 'ANY'
@@ -68,18 +63,6 @@ function! FollowMapping()
     call b:FollowDict.follow(line("."), virtcol("."))
 endfunction
 
-function! s:Curl(url)
-    return s:SystemCallWrapper('curl -s "' . a:url . '"')
-endfunction
-
-function! s:GetUrl(url)
-    if executable("curl")
-        return s:Curl(a:url)
-    elseif executable("wget")
-        return s:Wget(a:url)
-    endif
-endfunction
-
 function! s:OpenWindow()
     if exists("t:bufferName") && bufnr(t:bufferName) > -1
         let n = bufwinnr(t:bufferName)
@@ -118,7 +101,7 @@ endfunction
 function! s:LoadSyntaxHightlighting()
     syn match trackOne '.*\S\s$' display
     syn match trackTwo '.*\s\s$' display
-    syn match headers 'Track\s*Artist\s*Release Year\s*Album'
+    syn match headers 'Track\s*Artist\s*Album'
     hi def link trackOne Type
     hi def link trackTwo PreProc
     hi def link headers Comment
@@ -130,53 +113,30 @@ function! SpotifyTrackSearch(track)
         call s:OpenWindow()
         return
     endif
-    let b:isArtist = 0
-    let b:isAlbum = 0
     if ! has_key(s:cache.track_search, a:track)
-        let s:search_term = substitute(a:track, " ", "+", "g")
-        let cleantrack = substitute(a:track, " ", "\\\\%20", "g")
-        let l:url = s:spotify_track_search_url . l:cleantrack
-        let s:cache.track_search[a:track] = s:TrackSearchParse(s:GetUrl(l:url))
+        python << EOL
+import spotipy
+import vim
+s = spotipy.Spotify()
+results = s.search(vim.eval("a:track"), type="track")
+results['tracks']['next'] = 'None'
+results['tracks']['previous'] = 'None'
+vim.vars['tracks'] = vim.Dictionary(results)
+EOL
+    let s:cache.track_search[a:track] = g:tracks
     endif
     let tracks = s:cache.track_search[a:track]
-    if len(tracks) == 0
+    if len(tracks['tracks']['items']) == 0
         echo "No tracks could be found"
         return
     endif
     call s:OpenWindow()
     0,$d
-    call s:PrintTracks(tracks)
+    call s:PrintTracks(tracks['tracks'])
     setlocal nomodifiable
     2
     call s:BufferTrackSearchMappings()
     call s:LoadSyntaxHightlighting()
-endfunction
-
-function! s:CleanString(string)
-    " remove escaped quotes
-    let clean = substitute(a:string, '\\"', '', 'g')
-    let clean = substitute(clean, '\\/', '/', 'g')
-    " Convert unicode characters
-    return substitute(clean, '\\u[0-9a-f]\{2,6}', "\\=eval('\"'.submatch(0).'\"')", 'g')
-endfunction
-
-function! s:TrackSearchParse(json)
-    let splitter = split(a:json, '{"album"\zs')[1:]
-    let track_list = []
-    for item in splitter
-        let item = s:CleanString(item)
-        let contents = matchlist(item, '\v.*\{"released": "(\d{4})", "href": "([^"]+)", "name": "([^"]+)", "availability": \{"territories": "([^"]*)"\}\}, "name": "([^"]*)", .*"popularity": .*"(spotify:track:[^"]+)", "artists": .+"href": "([^"]*)".+ "name": "([^"]+)"}].*')
-        let track = {
-                    \ "year": contents[1],
-                    \ "album": { "uri": contents[2], "name": contents[3] },
-                    \ "territories": split(contents[4]),
-                    \ "name": contents[5],
-                    \ "uri": contents[6],
-                    \ "artist": { "uri": contents[7], "name": contents[8] }
-                    \ }
-        call add(track_list, track)
-    endfor
-    return track_list
 endfunction
 
 function! TrackFollow(line_number, column) dict
@@ -185,10 +145,11 @@ function! TrackFollow(line_number, column) dict
         return
     endif
     let track = self.tracks[a:line_number - 2]
-    if a:column > 102
+    if a:column > 88
         call s:AlbumLookup(track.album.uri)
     elseif a:column > 54 && a:column < 89
-        call ArtistLookup(track.artist.uri)
+        echo track
+        call ArtistLookup(track.artists[0].uri)
     else
         call s:SpotifyOpenTrackUri(track.uri)
     endif
@@ -202,12 +163,12 @@ endfunction
 
 function! s:PrintTracks(tracks)
     let shown_tracks = []
-    call setline(1, printf("%-53S %-33S %s %6S", "Track", "Artist", "Release Year", "Album"))
-    for track in a:tracks
-        if s:AvailableInTerritory(track.territories)
-            call add(shown_tracks, track)
-            call append("$", printf("%-50.50S    %-30.30S    %-10S    %S", track.name, track.artist.name, track.year, track.album.name))
-        endif
+    call setline(1, printf("%-53S %-33S %5S", "Track", "Artist", "Album"))
+    for track in a:tracks['items']
+        " if s:AvailableInTerritory(track.territories)
+        call add(shown_tracks, track)
+        call append("$", printf("%-50.50S    %-30.30S    %S", track.name, track.artists[0].name, track.album.name))
+        " endif
     endfor
     let b:FollowDict = MakeTrackFollower(shown_tracks)
     call s:AddTrailingWhiteSpace(1, line("$"))
@@ -222,45 +183,34 @@ endfunction
 
 function! ArtistLookup(artist_uri)
     if ! has_key(s:cache.artist, a:artist_uri)
-        let l:url = s:spotify_artist_lookup_url . a:artist_uri
-        let s:cache.artist[a:artist_uri] = s:ArtistParse(s:GetUrl(l:url))
+        python << EOL
+import spotipy
+import vim
+s = spotipy.Spotify()
+results = s.artist_albums(vim.eval("a:artist_uri"), album_type='album')
+results['previous'] = 'None'
+results['next'] = 'None'
+vim.vars['tracks'] = vim.Dictionary(results)
+EOL
+        let s:cache.artist[a:artist_uri] = g:tracks
     endif
     let artist = s:cache.artist[a:artist_uri]
     call s:OpenWindow()
     0,$d
-    call s:PrintArtist(artist)
+    call s:PrintArtistAlbums(artist)
     setlocal nomodifiable
     2
     call s:LoadSyntaxHightlighting()
 endfunction
 
-function! s:ArtistParse(json)
-    let split_albums = split(a:json, '{"album"\zs')
-    " Extract Artist Name from last line
-    let name = matchlist(s:CleanString(split_albums[-1]), '\v.* "name": "([^"]*)".*')[1]
-    let albums = []
-    for item in split_albums[1:]
-        let item = s:CleanString(item)
-        let contents = matchlist(item, '\v.*"name": "([^"]+)".* "href": "(spotify:album:[^"]+)", "availability": \{"territories": "([^"]*)"\}', 0, 1)[0:3]
-        " Sometimes href and name are in the other order...
-        if len(contents) != 4
-            let matched = matchlist(item, '\v.*"href": "(spotify:album:[^"]*)", "availability": \{"territories": "([^"]*)"\}, "name": "([^"]*)".* ')[0:3]
-            let contents = [matched[0], matched[3], matched[1], matched[2]]
-        endif
-        let album = { 'name' : contents[1], 'uri': contents[2], 'territories': split(contents[3]) }
-        call add(albums, album)
-    endfor
-    return { "albums": albums, "name": name }
-endfunction
-
-function! s:PrintArtist(artist)
-    call setline(1, printf("%S", a:artist.name))
+function! s:PrintArtistAlbums(artist)
+    " call setline(1, printf("%S", a:artist['items'][0]))
     let shown_albums = []
-    for album in a:artist.albums
-        if s:AvailableInTerritory(album.territories)
-            call add(shown_albums, album)
-            call append("$", printf("%S", album.name))
-        endif
+    for album in a:artist.items
+        " if s:AvailableInTerritory(album.territories)
+        call add(shown_albums, album)
+        call append("$", printf("%S", album.name))
+        " endif
     endfor
     let b:FollowDict = s:MakeArtistFollower(shown_albums)
     call s:AddTrailingWhiteSpace(1, line("$"))
@@ -281,11 +231,18 @@ function! s:MakeArtistFollower(albums)
 endfunction
 
 function! s:AlbumLookup(album_uri)
-    echo "Downloading Search now"
     let l:album = {}
     if ! has_key(s:cache.album, a:album_uri)
-        let l:url = s:spotify_album_lookup_url . a:album_uri
-        let s:cache.album[a:album_uri] = s:AlbumParse(s:GetUrl(l:url))
+        python << EOL
+import spotipy
+import vim
+s = spotipy.Spotify()
+results = s.album(vim.eval("a:album_uri"))
+results['tracks']['next'] = 'None'
+results['tracks']['previous'] = 'None'
+vim.vars['tracks'] = vim.Dictionary(results)
+EOL
+        let s:cache.album[a:album_uri] = g:tracks
     endif
 
     call s:OpenWindow()
@@ -303,9 +260,9 @@ function! AlbumFollow(line_number, column) dict
     if a:line_number == 0
         return
     endif
-    let track = self.album.tracks[a:line_number - 2]
+    let track = self.album.tracks.items[a:line_number - 2]
     if a:column > 60
-        call ArtistLookup(track.artist.uri)
+        call ArtistLookup(track.artists[0].uri)
     else
         call s:SpotifyOpenTrackUri(track.uri, self.album.uri)
     endif
@@ -317,36 +274,10 @@ function! s:MakeAlbumFollower(album)
     return closure
 endfunction
 
-function! s:AlbumParse(json)
-    let split_tracks = split(a:json, '{"available"\zs')
-    "1: name, 2: artist, 3: year
-    let info = matchlist(s:CleanString(split_tracks[0]), '\v.*"name": "([^"]*)".* "artist": "([^"]*)".* "released": "(\d{4})".*')
-    let album_uri = matchlist(split_tracks[-1], '\v"href": "(spotify:album:.{22})"')[1]
-    let album = {}
-    let tracks = []
-    for item in split_tracks[1:]
-        let item = s:CleanString(item)
-        let contents = matchlist(item, '\v.* "href": "([^"]{36})".* "artists": \[.+"href": "([^"]*)".+ "name": "([^"]*).*\].* "name": "([^"]+)".*"')
-        let track = {
-                    \ "uri": contents[1],
-                    \ "artist": { "uri": contents[2], "name": contents[3] },
-                    \ "name": contents[4]
-                    \ }
-        call add(tracks, track)
-    endfor
-    return {
-           \ "tracks": tracks,
-           \ "name": info[1],
-           \ "year": info[3],
-           \ "artist": { "name": info[2] },
-           \ "uri": album_uri
-           \ }
-endfunction
-
 function! s:PrintAlbum(album)
-    call setline(1, printf("%S - %S - %S", a:album.name, a:album.artist.name, a:album.year))
-    for track in a:album.tracks
-        call append("$", printf("%-60.60S %S", track.name, track.artist.name))
+    call setline(1, printf("%S - %S", a:album.name, a:album.artists[0].name))
+    for track in a:album.tracks.items
+        call append("$", printf("%-60.60S %S", track.name, track.artists[0].name))
     endfor
     let b:FollowDict = s:MakeAlbumFollower(a:album)
     call s:AddTrailingWhiteSpace(1, line("$"))
@@ -374,5 +305,4 @@ call s:SpotifyClearCache()
 let s:SpotifyOpenTrackUri = function( s:GetOS() . "UriOpener")
 
 command! -nargs=* Spotify call SpotifyTrackSearch("<args>")
-" command! -nargs=1 SpotifyOpenTrackUri call SpotifyOpenTrackUri("<args>")
 " command! -nargs=0 SpotifyClearCache call SpotifyClearCache()
