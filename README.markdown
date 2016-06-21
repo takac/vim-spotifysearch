@@ -53,6 +53,7 @@ These mappings will only work inside the spotify list buffer.
 This plugin isn't compatible with installations of vim on versions below 7.4.
 
 To check your version of vim run:
+
     vim --version
 
 If your installation isn't compatible then you need to update your version
