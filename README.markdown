@@ -66,6 +66,14 @@ Add `Bundle 'takac/vim-spotifysearch'` to your `~/.vimrc` and then:
 * either within Vim: `:BundleInstall`
 * or in your shell: `vim +BundleInstall +qall`
 
+##### Other Installation Methods
+*  [Pathogen](https://github.com/tpope/vim-pathogen)
+    *  `git clone https://github.com/takac/vim-spotifysearch ~/.vim/bundle/vim-spotifysearch`
+*  [Neobundle](https://github.com/Shougo/neobundle.vim)
+    *  `NeoBundle 'takac/vim-spotifysearch'`
+*  Manual
+    *  Copy the files into your `~/.vim` directory
+
 #### Installing 'spotipy'
 
 In order for this plugin to work, you will need to install ['spotipy'](https://github.com/plamere/spotipy).
@@ -73,10 +81,4 @@ In order for this plugin to work, you will need to install ['spotipy'](https://g
 [Please visit spotipy's readme on their repo for instructions on installing it](https://github.com/plamere/spotipy#installation)
 
 
-#### Other Installation Methods
-*  [Pathogen](https://github.com/tpope/vim-pathogen)
-    *  `git clone https://github.com/takac/vim-spotifysearch ~/.vim/bundle/vim-spotifysearch`
-*  [Neobundle](https://github.com/Shougo/neobundle.vim)
-    *  `NeoBundle 'takac/vim-spotifysearch'`
-*  Manual
-    *  Copy the files into your `~/.vim` directory
+
