@@ -47,12 +47,31 @@ play/pause, next and previous.
 These mappings will only work inside the spotify list buffer.
 
 ### Installation
+
+#### Checking if your installation of vim is compatible
+
+This plugin isn't compatible with installations of vim on versions below 7.4.
+
+To check your version of vim run:
+    vim --version
+
+If your installation isn't compatible then you need to update your version
+
+#### Installing the plugin
+
 I recommend installing using [Vundle](https://github.com/gmarik/vundle):
 
 Add `Bundle 'takac/vim-spotifysearch'` to your `~/.vimrc` and then:
 
 * either within Vim: `:BundleInstall`
 * or in your shell: `vim +BundleInstall +qall`
+
+#### Installing 'spotipy'
+
+In order for this plugin to work, you will need to install ['spotipy'](https://github.com/plamere/spotipy).
+
+[Please visit spotipy's readme on their repo for instructions on installing it](https://github.com/plamere/spotipy#installation)
+
 
 #### Other Installation Methods
 *  [Pathogen](https://github.com/tpope/vim-pathogen)
