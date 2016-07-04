@@ -26,6 +26,10 @@ Yields a new window with the search results
 
 Just hit enter to have the song played by spotify.
 
+If you want to search with a shorter command you can use `:S` in place of `:Spotify`. For instance, if youwere to execute the previous search with this shorter command you would run:
+
+    :S yeezus
+
 <img src="screenshot.png" height="80%" width="80%" alt="screenshot"/>
 
 ### Region Configuration
