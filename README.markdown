@@ -3,6 +3,10 @@ Vim Spotify Search
 
 A plugin to allow you to search and play tracks from spotify right inside Vim.
 
+<img src="demo.gif" alt="screenshot"/>
+
+### Tutorial
+
 Make sure you have spotify running externally, then in Vim:
 
     :Spotify yeezus
@@ -22,8 +26,6 @@ On Sight                                              Kanye West                
 Guilt Trip                                            Kanye West                        Yeezus
 
 Just hit enter to have the song played by spotify. If you want, you can even hit enter on the artists (for a list of their albums) and albums (for a list of all the songs in that album).
-
-<img src="screenshot.png" height="80%" width="80%" alt="screenshot"/>
 
 ### Region Configuration
 
