@@ -9,20 +9,17 @@ Make sure you have spotify running externally, then in Vim:
 
 Yields a new window with the search results
 
-    Track                    Artist             Release Year      Album
-    Bound 2                  Kanye West         2013              Yeezus
-    Black Skinhead           Kanye West         2013              Yeezus
-    Black Skinhead           Kanye West         2013              Yeezus
-    Bound 2                  Kanye West         2013              Yeezus
-    Blood On The Leaves      Kanye West         2013              Yeezus
-    New Slaves               Kanye West         2013              Yeezus
-    Blood On The Leaves      Kanye West         2013              Yeezus
-    Hold My Liquor           Kanye West         2013              Yeezus
-    I Am A God               God                2013              Yeezus
-    I'm In It                Kanye West         2013              Yeezus
-    .
-    .
-    .
+Track                                                 Artist                            Album
+Black Skinhead                                        Kanye West                        Yeezus
+Bound 2                                               Kanye West                        Yeezus
+Blood On The Leaves                                   Kanye West                        Yeezus
+New Slaves                                            Kanye West                        Yeezus
+Send It Up                                            Kanye West                        Yeezus
+Hold My Liquor                                        Kanye West                        Yeezus
+I Am A God                                            Kanye West                        Yeezus
+I'm In It                                             Kanye West                        Yeezus
+On Sight                                              Kanye West                        Yeezus
+Guilt Trip                                            Kanye West                        Yeezus
 
 Just hit enter to have the song played by spotify.
 
@@ -80,6 +77,3 @@ Add `Bundle 'takac/vim-spotifysearch'` to your `~/.vimrc` and then:
 In order for this plugin to work, you will need to install ['spotipy'](https://github.com/plamere/spotipy).
 
 [Please visit spotipy's readme on their repo for instructions on installing it](https://github.com/plamere/spotipy#installation)
-
-
-
