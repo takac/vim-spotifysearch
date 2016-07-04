@@ -13,17 +13,17 @@ Make sure you have spotify running externally, then in Vim:
 
 Yields a new window with the search results
 
-Track                                                 Artist                            Album
-Black Skinhead                                        Kanye West                        Yeezus
-Bound 2                                               Kanye West                        Yeezus
-Blood On The Leaves                                   Kanye West                        Yeezus
-New Slaves                                            Kanye West                        Yeezus
-Send It Up                                            Kanye West                        Yeezus
-Hold My Liquor                                        Kanye West                        Yeezus
-I Am A God                                            Kanye West                        Yeezus
-I'm In It                                             Kanye West                        Yeezus
-On Sight                                              Kanye West                        Yeezus
-Guilt Trip                                            Kanye West                        Yeezus
+    Track                                                 Artist                            Album
+    Black Skinhead                                        Kanye West                        Yeezus
+    Bound 2                                               Kanye West                        Yeezus
+    Blood On The Leaves                                   Kanye West                        Yeezus
+    New Slaves                                            Kanye West                        Yeezus
+    Send It Up                                            Kanye West                        Yeezus
+    Hold My Liquor                                        Kanye West                        Yeezus
+    I Am A God                                            Kanye West                        Yeezus
+    I'm In It                                             Kanye West                        Yeezus
+    On Sight                                              Kanye West                        Yeezus
+    Guilt Trip                                            Kanye West                        Yeezus
 
 Just hit enter to have the song played by spotify. If you want, you can even hit enter on the artists (for a list of their albums) and albums (for a list of all the songs in that album).
 
