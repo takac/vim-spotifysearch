@@ -21,7 +21,7 @@ I'm In It                                             Kanye West                
 On Sight                                              Kanye West                        Yeezus
 Guilt Trip                                            Kanye West                        Yeezus
 
-Just hit enter to have the song played by spotify.
+Just hit enter to have the song played by spotify. If you want, you can even hit enter on the artists (for a list of their albums) and albums (for a list of all the songs in that album).
 
 <img src="screenshot.png" height="80%" width="80%" alt="screenshot"/>
 
