@@ -305,4 +305,5 @@ call s:SpotifyClearCache()
 let s:SpotifyOpenTrackUri = function( s:GetOS() . "UriOpener")
 
 command! -nargs=* Spotify call SpotifyTrackSearch("<args>")
+command! -nargs=* S call SpotifyTrackSearch("<args>")
 " command! -nargs=0 SpotifyClearCache call SpotifyClearCache()
